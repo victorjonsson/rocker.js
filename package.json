@@ -1,0 +1,22 @@
+{
+    "author": "Victor Jonsson <kontakt@victorjonsson.se> (http://victorjonsson.se)",
+    "name": "rocker",
+    "description": "This is a javascript client used to communicate with a Rocker server",
+    "version": "1.0",
+    "homepage": "https://github.com/victorjonsson/rocker.js",
+    "keywords": ["API", "REST", "restful"],
+    "licenses": [{
+        "type": "MIT",
+        "url": "https://raw.github.com/mmstud/scribe-node/master/LICENSE"
+    }],
+    "repository": {
+        "type": "git",
+        "url": "git@github.com:victorjonsson/rocker.js.git"
+    },
+    "main": "./rocker",
+    "engines": {
+        "node": ">=0.4.11"
+    },
+    "dependencies": {},
+    "devDependencies": {}
+}

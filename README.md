@@ -28,11 +28,11 @@ server.createUser('john@gmail.com', 'John', 'password', userMeta, function(statu
 
 ### Methods
 
-- **setSecret(s)** — In case using encrypted authentication (more info below)
-- **setUser(email, password)** — Set authentication credentials
-- **me(callback)** — Get user data belonging to authenticated user
-- **createUser(email, nick, pass, meta, callback)** — Create a new user
-- **request(obj)** - Request an API operation. Example
+- **setSecret( s )** — In case using encrypted authentication (more info below)
+- **setUser( email, password )** — Set authentication credentials
+- **me( callback )** — Get user data belonging to authenticated user
+- **createUser( email, nick, pass, meta, callback )** — Create a new user
+- **request( obj )** — Request an API operation. Example
 
 ```js
 
