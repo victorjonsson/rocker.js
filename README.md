@@ -1,10 +1,8 @@
 rocker.js
 =========
 
-This is a javascript client that is used to communicate with a [Rocker server](https://github.com/victorjonsson/PHP-Rocker).
-This script **works both in a browser and as a nodejs module**.
-
-*A rocker server is a restful backend service (LAMP), [here you can read more about PHP-Rocker](https://github.com/victorjonsson/PHP-Rocker)*
+This is a javascript client used to communicate with a [Rocker server](https://github.com/victorjonsson/PHP-Rocker).
+This script **works both in a browser and as a nodejs module**. *(The Rocker server is a restful backend service (LAMP), [here you can read more about PHP-Rocker](https://github.com/victorjonsson/PHP-Rocker))*
 
 #### Example
 
@@ -31,7 +29,7 @@ server.createUser('john@gmail.com', 'John', 'password', userMeta, function(statu
 ### Methods
 
 - **setSecret(s)** — In case using encrypted authentication (more info below)
-- **setUser(email, password) — Set authentication credentials
+- **setUser(email, password)** — Set authentication credentials
 - **me(callback)** — Get user data belonging to authenticated user
 - **createUser(email, nick, pass, meta, callback)** — Create a new user
 - **request(obj)** - Request an API operation. Example
@@ -42,6 +40,12 @@ var server = new Rocker('https://api.website.com/');
 server.setUser('admin@gmail.com', 'thepassword');
 server.request({
     path : 'email/send',
+    method : 'POST',
+    data : {
+        to : 'anna@facebook.com',
+        subject : 'Hi there!',
+        body : 'I like your smile :)'
+    },
     auth : true, // send authorization header
     onComplete : function(status, json, http) {
         console.log(status); // the http status code
