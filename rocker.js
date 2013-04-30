@@ -142,6 +142,8 @@ var Rocker = (function(win) {
                 }
                 post = post.substr(0, post.length -1);
                 http.send(post);
+            } else if( requestObj.method == 'PUT' ) {
+                http.send(requestObj.data);
             } else {
                 http.send();
             }
@@ -186,6 +188,100 @@ var Rocker = (function(win) {
             req.end();
 
         }
+    };
+
+    /**
+     * @param {String} content As binary or text
+     * @param {String} name eg. 'my-file.txt'
+     * @param {Function} callback
+     * @param {Boolean} [base64Decode] Whether or not content should be base64 decoded on server before saved
+     * @param {Object} [imageVersions]
+     */
+    Rocker.prototype.saveFile = function(content, name, callback, base64Decode, imageVersions) {
+        var queryArgs = [];
+        if( imageVersions ) {
+            queryArgs[0] = '';
+            for(var x in imageVersions) {
+                if( imageVersions.hasOwnProperty(x) ) {
+                    queryArgs[0] += 'versions['+x+']='+imageVersions[x]+'&';
+                }
+            }
+            queryArgs[0] = queryArgs[0].substr(0, queryArgs[0].length-1);
+        }
+        if( base64Decode ) {
+            queryArgs.push('base64_decode=1');
+        }
+
+        var path = 'file/'+name+ (queryArgs.length ? '?'+queryArgs.join('&'):'');
+
+        this.request({
+            path : path,
+            data : content,
+            method: 'PUT',
+            auth : true,
+            onComplete : callback
+        });
+    };
+
+    /**
+     * Only applicable in browser. Requires that the browser has support for FileReader
+     * @param {HTMLInputElement} inputElement
+     * @param {Function} callback
+     * @param {Function} [beforeUploadCallback]
+     * @param {Object} [imageVersions]
+     */
+    Rocker.prototype.fileUpload = function(inputElement, callback, beforeUploadCallback, imageVersions) {
+        var _rocker = this;
+        inputElement.onchange = function() {
+
+            var file = this.files[0];
+            if( typeof beforeUploadCallback == 'function' && beforeUploadCallback(file) === false) {
+                return;
+            }
+
+            var reader = new win.FileReader();
+            reader.onloadend = function () {
+                var content = reader.result;
+                if( content.indexOf('data:') === 0 ) {
+                    content = content.substr(content.indexOf(',')+1);
+                }
+                _rocker.saveFile(
+                    content,
+                    'fileName' in file ? file.fileName : file.name,
+                    function(status, body) {
+                        if( status == 201 ) {
+                            callback('success', body);
+                        } else {
+                            callback('server-error', {status: status, body:body});
+                        }
+                    },
+                    true,
+                    imageVersions
+                )
+            };
+
+            reader.onerror = function (event) {
+                var mess = '';
+                switch (event.target.error.code) {
+                    case event.target.error.NOT_FOUND_ERR:
+                        mess = 'File not found!';
+                        break;
+                    case event.target.error.NOT_READABLE_ERR:
+                        mess = 'File not readable!';
+                        break;
+                    case event.target.error.ABORT_ERR:
+                        mess = 'Aborted';
+                        break;
+                    default:
+                        mess = 'Unkown...';
+                        break;
+                }
+                console.log(event.target.error);
+                callback('browser-error', mess);
+            };
+
+            reader.readAsDataURL(file);
+        };
     };
 
     /**
