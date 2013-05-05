@@ -32,7 +32,7 @@ server.createUser('john@gmail.com', 'John', 'password', userMeta, function(statu
 - **setUser( email, password )** — Set authentication credentials
 - **me( callback )** — Get user data belonging to authenticated user
 - **createUser( email, nick, pass, meta, callback )** — Create a new user
-- **saveFile( content, name, callback, base64Decode, imageVersions)** — Save a file related to authenticated user (more info below)
+- **saveFile( content, name, contentType, callback, base64Decode, imageVersions)** — Save a file related to authenticated user (more info below)
 - **fileUpload( inputElement, callback, beforeUploadCallback, imageVersions )** — Browser only (more info below)
 - **removeFile( name, callback )**
 - **request( obj )** — Request an API operation. Example
@@ -156,6 +156,7 @@ var onFileSent = function(status, response) {
 
 // Send file to server
 server.saveFile(
+    imgBase64,
     'file/my-image.jpg', // you can user what ever file name you want for your file
     mimeType,
     onFileSent, // the callback
