@@ -121,6 +121,13 @@ var Rocker = (function(win) {
             };
             http.open(requestObj.method, this.baseURI + requestObj.path, true);
             http.setRequestHeader('X-Requested-With', 'xmlhttprequest');
+            if( requestObj.headers ) {
+                for(var x in requestObj.headers) {
+                    if( requestObj.headers.hasOwnProperty(x) ) {
+                        http.setRequestHeader(x, requestObj.headers[x]);
+                    }
+                }
+            }
             if( requestObj.auth && this.auth ) {
                 http.setRequestHeader('Authorization', this.auth);
             }
@@ -197,7 +204,7 @@ var Rocker = (function(win) {
      * @param {Boolean} [base64Decode] Whether or not content should be base64 decoded on server before saved
      * @param {Object} [imageVersions]
      */
-    Rocker.prototype.saveFile = function(content, name, callback, base64Decode, imageVersions) {
+    Rocker.prototype.saveFile = function(content, name, mime, callback, base64Decode, imageVersions) {
         var queryArgs = [];
         if( imageVersions ) {
             queryArgs[0] = '';
@@ -218,6 +225,25 @@ var Rocker = (function(win) {
             path : path,
             data : content,
             method: 'PUT',
+            auth : true,
+            headers : {
+                'Content-Type': mime
+            },
+            onComplete : callback
+        });
+    };
+
+    /**
+     * @param {String} name
+     * @param {Function} callback
+     */
+    Rocker.prototype.removeFile = function(name, callback) {
+        if( name.indexOf('/') > -1 ) {
+            name = name.split('/')[1];
+        }
+        this.request({
+            path : 'file/'+name,
+            method : 'DELETE',
             auth : true,
             onComplete : callback
         });
@@ -248,6 +274,7 @@ var Rocker = (function(win) {
                 _rocker.saveFile(
                     content,
                     'fileName' in file ? file.fileName : file.name,
+                    file.type,
                     function(status, body) {
                         if( status == 201 ) {
                             callback('success', body);

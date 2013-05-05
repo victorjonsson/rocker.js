@@ -131,6 +131,7 @@ Nodejs example:
 ```js
 
 var fs = require('fs'),
+    mime = require('mime'),
     Rocker = require('rocker'),
     server = new Rocker('https://api.website.com/');
 
@@ -138,7 +139,8 @@ var fs = require('fs'),
 server.setUser('admin@website.com', 'password....');
 
 // Load image into base64 encoded string (only binary files needs to be base64 encoded)
-var imgBase64 = new Buffer(fs.readFileSync('my-image.jpg', 'binary'), 'binary').toString('base64');
+var imgBase64 = new Buffer(fs.readFileSync('my-image.jpg', 'binary'), 'binary').toString('base64'),
+    mimeType = mime.lookup('my-image.jpg');
 
 // Declare callback
 var onFileSent = function(status, response) {
@@ -154,6 +156,7 @@ var onFileSent = function(status, response) {
 // Send file to server
 server.saveFile(
     'file/my-image.jpg', // you can user what ever file name you want for your file
+    mimeType,
     onFileSent, // the callback
     true, // Boolean telling the server if file content should be base64 decoded
     {thumb : '100x100'} // object with image versions (generated in case saved file is an image)
