@@ -34,6 +34,7 @@ server.createUser('john@gmail.com', 'John', 'password', userMeta, function(statu
 - **createUser( email, nick, pass, meta, callback )** — Create a new user
 - **saveFile( content, name, callback, base64Decode, imageVersions)** — Save a file related to authenticated user (more info below)
 - **fileUpload( inputElement, callback, beforeUploadCallback, imageVersions )** — Browser only (more info below)
+- **removeFile( name, callback )**
 - **request( obj )** — Request an API operation. Example
 
 ```js
