@@ -5,7 +5,7 @@
  * a Rocker server (https://github.com/victorjonsson/PHP-Rocker).
  * This script works both in a browser and as a nodejs module
  *
- * version: 1.0
+ * version: 1.1.4
  * author: Victor Jonsson (http://victorjonsson.se)
  * license: MIT
  */
@@ -68,16 +68,23 @@ var Rocker = (function(win) {
     /**
      * @param {String} user
      * @param {String} pass
+     * @param {String} [mechanism]
+     * @param {Boolean} [base64Encode]
      */
-    Rocker.prototype.setUser = function(user, pass) {
-        var mechanism = 'basic ';
+    Rocker.prototype.setUser = function(user, pass, mechanism, base64Encode) {
+        if( base64Encode === undefined )
+            base64Encode = true;
+        if( !mechanism )
+            mechanism = 'basic';
+
         this.auth = user+':'+pass;
         if( this.secret ) {
-            this.auth = RC4Cipcher.encrypt(this.secret, this.auth);
-            mechanism = 'RC4 ';
+            this.auth = RC4Cipher.encrypt(this.secret, this.auth);
+            mechanism = 'rc4';
         }
+
         this.user = user;
-        this.auth = mechanism + Base64.encode(this.auth);
+        this.auth = mechanism +' '+ (base64Encode ? Base64.encode(this.auth) : this.auth);
     };
 
     /**
@@ -200,6 +207,7 @@ var Rocker = (function(win) {
     /**
      * @param {String} content As binary or text
      * @param {String} name eg. 'my-file.txt'
+     * @param {String} mime
      * @param {Function} callback
      * @param {Boolean} [base64Decode] Whether or not content should be base64 decoded on server before saved
      * @param {Object} [imageVersions]
@@ -317,8 +325,8 @@ var Rocker = (function(win) {
     Rocker.prototype.getServerVersion = function(callback) {
         this.request({
             path : 'system/version',
-            onComplete : function(status, json) {
-                callback(json.version);
+            onComplete : function(status, json, http) {
+                callback(status == 200 ? json.version:false, status, http);
             }
         });
     };
@@ -329,8 +337,8 @@ var Rocker = (function(win) {
     Rocker.prototype.getAvailableOperations = function(callback) {
         this.request({
             path : 'operations',
-            onComplete : function(status, json) {
-                callback(json);
+            onComplete : function(status, json, http) {
+                callback(status==200 ? json:false, status, http);
             }
         });
     };
@@ -342,8 +350,8 @@ var Rocker = (function(win) {
         this.request({
             path : 'me',
             auth : true,
-            onComplete : function(status, json) {
-                callback(status == 200 ? json:false);
+            onComplete : function(status, json, http) {
+                callback(status == 200 ? json:false, status, http);
             }
         });
     };
@@ -380,7 +388,13 @@ var Rocker = (function(win) {
      * - RC4 encrypt/decrypt
      * - Base64 encode/decode
      */
-    var Utf8={};Utf8.encode=function(strUni){var strUtf=strUni.replace(/[\u0080-\u07ff]/g,function(c){var cc=c.charCodeAt(0);return String.fromCharCode(192|cc>>6,128|cc&63)});strUtf=strUtf.replace(/[\u0800-\uffff]/g,function(c){var cc=c.charCodeAt(0);return String.fromCharCode(224|cc>>12,128|cc>>6&63,128|cc&63)});return strUtf};Utf8.decode=function(strUtf){var strUni=strUtf.replace(/[\u00e0-\u00ef][\u0080-\u00bf][\u0080-\u00bf]/g,function(c){var cc=(c.charCodeAt(0)&15)<<12|(c.charCodeAt(1)&63)<<6|c.charCodeAt(2)&63;return String.fromCharCode(cc)});strUni=strUni.replace(/[\u00c0-\u00df][\u0080-\u00bf]/g,function(c){var cc=(c.charCodeAt(0)&31)<<6|c.charCodeAt(1)&63;return String.fromCharCode(cc)});return strUni};var RC4Cipcher={encrypt:function(key,pt){var s=new Array;for(var i=0;i<256;i++){s[i]=i}var j=0,x;for(i=0;i<256;i++){j=(j+s[i]+key.charCodeAt(i%key.length))%256;x=s[i];s[i]=s[j];s[j]=x}i=0;j=0;var ct="";for(var y=0;y<pt.length;y++){i=(i+1)%256;j=(j+s[i])%256;x=s[i];s[i]=s[j];s[j]=x;ct+=String.fromCharCode(pt.charCodeAt(y)^s[(s[i]+s[j])%256])}return ct},decrypt:function(key,ct){return this.encrypt(key,ct)}};var Base64={};Base64.code="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";Base64.encode=function(str,utf8encode){utf8encode=typeof utf8encode=="undefined"?false:utf8encode;var o1,o2,o3,bits,h1,h2,h3,h4,e=[],pad="",c,plain,coded;var b64=Base64.code;plain=utf8encode?str.encodeUTF8():str;c=plain.length%3;if(c>0){while(c++<3){pad+="=";plain+="\0"}}for(c=0;c<plain.length;c+=3){o1=plain.charCodeAt(c);o2=plain.charCodeAt(c+1);o3=plain.charCodeAt(c+2);bits=o1<<16|o2<<8|o3;h1=bits>>18&63;h2=bits>>12&63;h3=bits>>6&63;h4=bits&63;e[c/3]=b64.charAt(h1)+b64.charAt(h2)+b64.charAt(h3)+b64.charAt(h4)}coded=e.join("");coded=coded.slice(0,coded.length-pad.length)+pad;return coded};Base64.decode=function(str,utf8decode){utf8decode=typeof utf8decode=="undefined"?false:utf8decode;var o1,o2,o3,h1,h2,h3,h4,bits,d=[],plain,coded;var b64=Base64.code;coded=utf8decode?str.decodeUTF8():str;for(var c=0;c<coded.length;c+=4){h1=b64.indexOf(coded.charAt(c));h2=b64.indexOf(coded.charAt(c+1));h3=b64.indexOf(coded.charAt(c+2));h4=b64.indexOf(coded.charAt(c+3));bits=h1<<18|h2<<12|h3<<6|h4;o1=bits>>>16&255;o2=bits>>>8&255;o3=bits&255;d[c/4]=String.fromCharCode(o1,o2,o3);if(h4==64)d[c/4]=String.fromCharCode(o1,o2);if(h3==64)d[c/4]=String.fromCharCode(o1)}plain=d.join("");return utf8decode?plain.decodeUTF8():plain};
+    var Utf8={};Utf8.encode=function(strUni){var strUtf=strUni.replace(/[\u0080-\u07ff]/g,function(c){var cc=c.charCodeAt(0);return String.fromCharCode(192|cc>>6,128|cc&63)});strUtf=strUtf.replace(/[\u0800-\uffff]/g,function(c){var cc=c.charCodeAt(0);return String.fromCharCode(224|cc>>12,128|cc>>6&63,128|cc&63)});return strUtf};Utf8.decode=function(strUtf){var strUni=strUtf.replace(/[\u00e0-\u00ef][\u0080-\u00bf][\u0080-\u00bf]/g,function(c){var cc=(c.charCodeAt(0)&15)<<12|(c.charCodeAt(1)&63)<<6|c.charCodeAt(2)&63;return String.fromCharCode(cc)});strUni=strUni.replace(/[\u00c0-\u00df][\u0080-\u00bf]/g,function(c){var cc=(c.charCodeAt(0)&31)<<6|c.charCodeAt(1)&63;return String.fromCharCode(cc)});return strUni};var RC4Cipher={encrypt:function(key,pt){var s=new Array;for(var i=0;i<256;i++){s[i]=i}var j=0,x;for(i=0;i<256;i++){j=(j+s[i]+key.charCodeAt(i%key.length))%256;x=s[i];s[i]=s[j];s[j]=x}i=0;j=0;var ct="";for(var y=0;y<pt.length;y++){i=(i+1)%256;j=(j+s[i])%256;x=s[i];s[i]=s[j];s[j]=x;ct+=String.fromCharCode(pt.charCodeAt(y)^s[(s[i]+s[j])%256])}return ct},decrypt:function(key,ct){return this.encrypt(key,ct)}};var Base64={};Base64.code="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";Base64.encode=function(str,utf8encode){utf8encode=typeof utf8encode=="undefined"?false:utf8encode;var o1,o2,o3,bits,h1,h2,h3,h4,e=[],pad="",c,plain,coded;var b64=Base64.code;plain=utf8encode?str.encodeUTF8():str;c=plain.length%3;if(c>0){while(c++<3){pad+="=";plain+="\0"}}for(c=0;c<plain.length;c+=3){o1=plain.charCodeAt(c);o2=plain.charCodeAt(c+1);o3=plain.charCodeAt(c+2);bits=o1<<16|o2<<8|o3;h1=bits>>18&63;h2=bits>>12&63;h3=bits>>6&63;h4=bits&63;e[c/3]=b64.charAt(h1)+b64.charAt(h2)+b64.charAt(h3)+b64.charAt(h4)}coded=e.join("");coded=coded.slice(0,coded.length-pad.length)+pad;return coded};Base64.decode=function(str,utf8decode){utf8decode=typeof utf8decode=="undefined"?false:utf8decode;var o1,o2,o3,h1,h2,h3,h4,bits,d=[],plain,coded;var b64=Base64.code;coded=utf8decode?str.decodeUTF8():str;for(var c=0;c<coded.length;c+=4){h1=b64.indexOf(coded.charAt(c));h2=b64.indexOf(coded.charAt(c+1));h3=b64.indexOf(coded.charAt(c+2));h4=b64.indexOf(coded.charAt(c+3));bits=h1<<18|h2<<12|h3<<6|h4;o1=bits>>>16&255;o2=bits>>>8&255;o3=bits&255;d[c/4]=String.fromCharCode(o1,o2,o3);if(h4==64)d[c/4]=String.fromCharCode(o1,o2);if(h3==64)d[c/4]=String.fromCharCode(o1)}plain=d.join("");return utf8decode?plain.decodeUTF8():plain};
+
+    // Make utility functions available through Rocker.Utils
+    Rocker.Utils = {
+        RC4Cipher : RC4Cipher,
+        Base64 : Base64
+    };
 
     return Rocker;
 
