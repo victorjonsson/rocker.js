@@ -11,3 +11,6 @@
 ### 1.1.5
     - Now possible to declare authentication mechanism when calling Rocker.setUser();
     - More callback arguments in functions Rocker.me() Rocker.version() and Rocker.operations()
+
+### 1.1.6
+    - Minor improvements
