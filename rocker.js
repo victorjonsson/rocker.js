@@ -9,7 +9,7 @@
  * author: Victor Jonsson (http://victorjonsson.se)
  * license: MIT
  */
-var Rocker = (function(win) {
+var Rocker = (function(win, undefined) {
 
     'use strict';
 
@@ -40,22 +40,66 @@ var Rocker = (function(win) {
 
             // we shouldn't have come this far
             throw new Error('Unable to parse JSON');
+        },
+        parseURL= function(str, component) {
+            // http://kevin.vanzonneveld.net
+            // +      original by: Steven Levithan (http://blog.stevenlevithan.com)
+            // + reimplemented by: Brett Zamir (http://brett-zamir.me)
+            // + input by: Lorenzo Pisani
+            var query, key = ['source', 'scheme', 'authority', 'userInfo', 'user', 'pass', 'host', 'port',
+                    'relative', 'path', 'directory', 'file', 'query', 'fragment'],
+                ini = {},
+                mode = (ini['phpjs.parse_url.mode'] &&
+                    ini['phpjs.parse_url.mode'].local_value) || 'php',
+                parser = {
+                    php: /^(?:([^:\/?#]+):)?(?:\/\/()(?:(?:()(?:([^:@]*):?([^:@]*))?@)?([^:\/?#]*)(?::(\d*))?))?()(?:(()(?:(?:[^?#\/]*\/)*)()(?:[^?#]*))(?:\?([^#]*))?(?:#(.*))?)/,
+                    strict: /^(?:([^:\/?#]+):)?(?:\/\/((?:(([^:@]*):?([^:@]*))?@)?([^:\/?#]*)(?::(\d*))?))?((((?:[^?#\/]*\/)*)([^?#]*))(?:\?([^#]*))?(?:#(.*))?)/,
+                    loose: /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/\/?)?((?:(([^:@]*):?([^:@]*))?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/ // Added one optional slash to post-scheme to catch file:/// (should restrict this)
+                };
+
+            var m = parser[mode].exec(str),
+                uri = {},
+                i = 14;
+            while (i--) {
+                if (m[i]) {
+                    uri[key[i]] = m[i];
+                }
+            }
+
+            if (component) {
+                return uri[component.replace('PHP_URL_', '').toLowerCase()];
+            }
+
+            delete uri.source;
+
+            var location = win ? (win.location || {}) : {};
+
+            if( !uri.port )
+                uri.port = location.port || '80';
+            if( !uri.path )
+                uri.path = '/';
+            if( !uri.scheme ) {
+                uri.scheme = location.protocol;
+                uri.scheme = uri.scheme.substr(0, uri.scheme.length - 1);
+                if( uri.port == '80' ) {
+                    uri.port = '443';
+                }
+            }
+
+            return uri;
         };
 
     /**
      * Rocker REST server client
-     * @param {String} baseURI
+     * @param {String} baseURL
      * @param {Number} [maxConcurrentRequests]
      */
-    function Rocker(baseURI, maxConcurrentRequests) {
-        this.baseURI = baseURI;
+    function Rocker(baseURL, maxConcurrentRequests) {
+        this.base = parseURL(baseURL);
         this.maxConcurrentRequests = maxConcurrentRequests ? maxConcurrentRequests:(IS_BROWSER ? 5:50);
         this.auth = false;
         this.user = false;
         this.secret = false;
-        if( !IS_BROWSER ) {
-            this.baseURI = require('url').parse(this.baseURI);
-        }
     }
 
     /**
@@ -63,6 +107,11 @@ var Rocker = (function(win) {
      */
     Rocker.prototype.setSecret = function(s) {
         this.secret = s;
+        if( this.auth ) {
+            var authParts = this.auth.split(' ');
+            authParts.splice(0,1);
+            this.auth = 'rc4 ' + authParts.join(' ');
+        }
     };
 
     /**
@@ -94,10 +143,39 @@ var Rocker = (function(win) {
      *  method - GET, PUT, POST, DELETE (default is GET)
      *  auth - Whether or not send authorization header, authentication credentials is set using rocker.setUser()
      *  onComplete - function that gets executed when response is finished
+     *  cache - Optional, whether or not to append random parameter to break through cache (onluy in browser)
+     *  host - Switch to another end point than the one registered on construction of the Rocker object
+     *
+     *  @example
+     *
+     *  var server = new Rocker('https://mywebsite.com/api/v1/');
+     *  server.setUser('user@website.com', '....');
+     *  server.request({
+     *      path : 'statistics/views',
+     *      method : 'POST',
+     *      data : {
+     *          object : 91234,
+     *          viewer : 152
+     *      }
+     *      auth : true,
+     *      onComplete : function(status, obj, xmlHttp) {
+     *          ...
+     *      },
+     *      host : 'api.service.com' // optional, overrides host extracted from base URL given on construct
+     *  });
+     *
+     *  To create a general error handler that always will be called server responds
+     *  with a http status greater than 300 you can do the following:
+     *  var server = new Rocker('http://api.mysite.com/');
+     *  server.onError = function(status, obj, xmlHttp) {
+     *      ...
+     *      // return false to prevent omComplete callback to be called
+     *  };
      *
      * @param {Object} requestObj
      */
     Rocker.prototype.request = function(requestObj) {
+
         var _rocker = this;
         if( concurrent > this.maxConcurrentRequests ) {
             setTimeout(function() {
@@ -110,7 +188,11 @@ var Rocker = (function(win) {
 
         var onFinished = function(status, content, http) {
             concurrent--;
-            if( typeof requestObj.onComplete == 'function' ) {
+            var callCompleteCallback = true;
+            if( status >= 300 && typeof _rocker.onError == 'function') {
+                callCompleteCallback = _rocker.onError(status, parseJSON(content), http);
+            }
+            if( typeof requestObj.onComplete == 'function' && callCompleteCallback !== false ) {
                 requestObj.onComplete(status, status == 204 ? {}:parseJSON(content), http);
             }
         };
@@ -119,14 +201,26 @@ var Rocker = (function(win) {
             requestObj.method = 'GET';
 
         if( IS_BROWSER ) {
-
             var http = 'XMLHttpRequest' in win ? new XMLHttpRequest() : new ActiveXObject("Microsoft.XMLHTTP");
             http.onreadystatechange = function() {
                 if( http.readyState == 4 ) {
                     onFinished(http.status, http.responseText, http);
                 }
             };
-            http.open(requestObj.method, this.baseURI + requestObj.path, true);
+
+            var apiURL = [
+                this.base.scheme +'://',
+                (requestObj.host ? requestObj.host:this.base.host),
+                ':'+this.base.port,
+                this.base.path,
+                requestObj.path
+            ].join('');
+
+            if( requestObj.method == 'GET' && !requestObj.cache ) {
+                apiURL += (apiURL.indexOf('?') > -1 ? '&':'?') + '_=' + (new Date().getTime());
+            }
+
+            http.open(requestObj.method, apiURL, true);
             http.setRequestHeader('X-Requested-With', 'xmlhttprequest');
             if( requestObj.headers ) {
                 for(var x in requestObj.headers) {
@@ -178,10 +272,11 @@ var Rocker = (function(win) {
             if( !requestObj.data ) {
                 requestObj.data = '';
             }
-            requestObj.port = this.baseURI.port;
-            requestObj.host = this.baseURI.host;
-            requestObj.protocol = this.baseURI.protocol;
-            requestObj.path = this.baseURI.path + requestObj.path;
+
+            requestObj.port = this.base.port;
+            requestObj.host = requestObj.host ? requestObj.host : this.base.host;
+            requestObj.scheme = this.base.scheme;
+            requestObj.path = this.base.path + requestObj.path;
 
             var req = require('http').request(requestObj, function(response) {
                 var collectedBody = '';
@@ -347,10 +442,14 @@ var Rocker = (function(win) {
      * @param callback
      */
     Rocker.prototype.me = function(callback) {
+        var _self = this;
         this.request({
             path : 'me',
             auth : true,
             onComplete : function(status, json, http) {
+                if( status == 200 ) {
+                    _self.user = json;
+                }
                 callback(status == 200 ? json:false, status, http);
             }
         });
