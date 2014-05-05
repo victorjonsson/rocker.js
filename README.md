@@ -46,7 +46,7 @@ server.request({
     data : {
         to : 'anna@facebook.com',
         subject : 'Hi there!',
-        body : 'I like your smile :)'
+        body : '...'
     },
     auth : true, // send authorization header
     onComplete : function(status, json, http) {
